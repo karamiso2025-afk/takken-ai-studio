@@ -95,17 +95,20 @@ export function ContentView({
     setStatus(null)
     setActiveTab('manga')
     try {
-      const res = await fetch('/api/generate', {
+      // Use sync endpoint (no Inngest needed)
+      const res = await fetch('/api/generate/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ topic_id: topicId, content_type: 'manga' }),
+        body: JSON.stringify({ topic_id: topicId }),
       })
       const data = await res.json()
       if (data.content_id) {
         setActiveContentId(data.content_id)
         onContentGenerated(data.content_id)
-        setPolling(true)
         pollStatus(data.content_id)
+      } else {
+        console.error('Generate error:', data)
+        setGenerating(false)
       }
     } catch (err) {
       console.error('Generate failed:', err)
