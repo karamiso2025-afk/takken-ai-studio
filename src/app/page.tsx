@@ -7,6 +7,7 @@ import { DashboardView } from '@/components/DashboardView'
 import { ContentView } from '@/components/ContentView'
 import { QuizView } from '@/components/QuizView'
 import { SettingsView } from '@/components/SettingsView'
+import { AuthGate } from '@/components/AuthGate'
 
 export type ViewType = 'dashboard' | 'content' | 'quiz' | 'settings'
 
@@ -26,6 +27,7 @@ export default function Home() {
   }
 
   return (
+    <AuthGate>
     <div className="flex h-screen overflow-hidden">
       <Sidebar
         open={sidebarOpen}
@@ -57,5 +59,6 @@ export default function Home() {
         </main>
       </div>
     </div>
+    </AuthGate>
   )
 }
