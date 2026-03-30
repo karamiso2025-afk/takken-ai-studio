@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServerSupabaseClient, createServiceClient } from '@/lib/supabase/server'
 import { generateScenario } from '@/lib/claude/generate-scenario'
 import { generateImage } from '@/lib/gemini/generate-image'
+import { getCharacterByKey } from '@/lib/characters'
 
 export const maxDuration = 300 // 5 min timeout
 
@@ -147,6 +148,10 @@ export async function POST(req: NextRequest) {
   }
 }
 
+function escapeXml(str: string): string {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
+
 function generateSvgFallback(panel: {
   panel_number: number
   scene: string
@@ -154,17 +159,40 @@ function generateSvgFallback(panel: {
   narrator_box?: string
   info_box?: string
 }): string {
-  const dialogueTexts = panel.dialogue
-    .map((d, i) => `<text x="20" y="${80 + i * 30}" font-size="14" fill="#333">${d.character}: ${d.text}</text>`)
-    .join('\n    ')
+  // キャラクターキーを日本語名に変換
+  const getCharName = (key: string) => {
+    const char = getCharacterByKey(key)
+    return char ? char.name.split(' ')[0] : key  // 「田中」のように姓だけ
+  }
+
+  // 吹き出しを交互左右に配置（最大4つ）
+  const bubbles = panel.dialogue.slice(0, 4).map((d, i) => {
+    const isLeft = i % 2 === 0
+    const x = isLeft ? 15 : 145
+    const y = 50 + i * 38
+    const name = escapeXml(getCharName(d.character))
+    const text = escapeXml(d.text.slice(0, 22))
+    const bubbleColor = isLeft ? '#FFF9C4' : '#E8F5E9'
+    const nameColor = isLeft ? '#F57F17' : '#2E7D32'
+    return `
+  <rect x="${x}" y="${y}" width="120" height="30" fill="${bubbleColor}" stroke="#ccc" stroke-width="1" rx="6"/>
+  <text x="${x + 4}" y="${y + 11}" font-size="9" fill="${nameColor}" font-weight="bold">${name}</text>
+  <text x="${x + 4}" y="${y + 24}" font-size="11" fill="#333">${text}</text>`
+  }).join('')
+
+  const infoBoxSvg = panel.info_box
+    ? `<rect x="8" y="170" width="264" height="24" fill="#1565C0" rx="4"/>
+  <text x="140" y="186" text-anchor="middle" font-size="11" fill="white" font-weight="bold">📌 ${escapeXml(panel.info_box.slice(0, 24))}</text>`
+    : ''
+
+  const sceneText = escapeXml(panel.scene.slice(0, 20))
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="280" height="200" viewBox="0 0 280 200">
-  <rect width="280" height="200" fill="#FFF8E1" stroke="#E0D4B0" stroke-width="2" rx="8"/>
-  <text x="140" y="25" text-anchor="middle" font-size="12" fill="#666">Panel ${panel.panel_number}</text>
-  <line x1="10" y1="35" x2="270" y2="35" stroke="#E0D4B0"/>
-  <text x="140" y="55" text-anchor="middle" font-size="11" fill="#888">${panel.scene.slice(0, 30)}</text>
-  ${dialogueTexts}
-  ${panel.info_box ? `<rect x="10" y="160" width="260" height="30" fill="#E3F2FD" rx="4"/>
-  <text x="140" y="180" text-anchor="middle" font-size="10" fill="#1565C0">${panel.info_box.slice(0, 40)}</text>` : ''}
+  <rect width="280" height="200" fill="#FFFDE7" stroke="#E0D4B0" stroke-width="2" rx="8"/>
+  <rect width="280" height="30" fill="#795548" rx="8"/>
+  <rect x="0" y="20" width="280" height="10" fill="#795548"/>
+  <text x="140" y="20" text-anchor="middle" font-size="13" fill="white" font-weight="bold">コマ ${panel.panel_number}　${sceneText}</text>
+  ${bubbles}
+  ${infoBoxSvg}
 </svg>`
 }
