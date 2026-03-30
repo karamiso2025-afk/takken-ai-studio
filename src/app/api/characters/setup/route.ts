@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server'
-import { createServerSupabaseClient } from '@/lib/supabase/server'
-import { inngest } from '@/lib/inngest/client'
+import { createServerSupabaseClient, createServiceClient } from '@/lib/supabase/server'
+import { generateCharacterSheet } from '@/lib/gemini/generate-image'
+import { ALL_CHARACTERS } from '@/lib/characters'
+
+export const maxDuration = 60
 
 export async function POST() {
   const supabase = await createServerSupabaseClient()
@@ -10,8 +13,10 @@ export async function POST() {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const svc = createServiceClient()
+
   // Check if already generated
-  const { data: existing } = await supabase
+  const { data: existing } = await svc
     .from('character_sheets')
     .select('id')
     .eq('user_id', user.id)
@@ -21,11 +26,36 @@ export async function POST() {
     return NextResponse.json({ status: 'already_exists' })
   }
 
-  // Trigger async job
-  await inngest.send({
-    name: 'takken/setup.characters',
-    data: { userId: user.id },
-  })
+  // Generate all character sheets in parallel
+  const results = await Promise.allSettled(
+    ALL_CHARACTERS.map(async (char) => {
+      const imageBuffer = await generateCharacterSheet(char.name, char.promptDescription)
 
-  return NextResponse.json({ status: 'queued' })
+      const filePath = `${user.id}/${char.key}.png`
+      const { error: uploadError } = await svc.storage
+        .from('character-sheets')
+        .upload(filePath, imageBuffer, { contentType: 'image/png', upsert: true })
+
+      if (uploadError) throw uploadError
+
+      const { data: urlData } = svc.storage
+        .from('character-sheets')
+        .getPublicUrl(filePath)
+
+      await svc.from('character_sheets').upsert({
+        user_id: user.id,
+        character_key: char.key,
+        character_type: char.type,
+        storage_path: filePath,
+        public_url: urlData.publicUrl,
+      })
+
+      return { key: char.key, url: urlData.publicUrl }
+    })
+  )
+
+  const succeeded = results.filter((r) => r.status === 'fulfilled').length
+  const failed = results.filter((r) => r.status === 'rejected').length
+
+  return NextResponse.json({ status: 'complete', succeeded, failed, total: ALL_CHARACTERS.length })
 }
