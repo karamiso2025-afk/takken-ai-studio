@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createServerSupabaseClient, createServiceClient } from '@/lib/supabase/server'
 import { ALL_CHARACTERS, CharacterDef } from '@/lib/characters'
+import { generateCharacterSheet } from '@/lib/gemini/generate-image'
 
 export const maxDuration = 60
 
@@ -330,16 +331,30 @@ export async function POST() {
   // バケットが存在しない場合は作成
   await svc.storage.createBucket('character-sheets', { public: true }).catch(() => {/* already exists */})
 
-  // 全キャラクターのSVGを生成してStorageに保存
+  // 全キャラクターの画像を生成してStorageに保存（Gemini Imagen → SVGフォールバック）
   const results = await Promise.allSettled(
     ALL_CHARACTERS.map(async (char) => {
-      const svgContent = generateSvgCharacterSheet(char)
-      const svgBuffer = Buffer.from(svgContent, 'utf-8')
+      let imageBuffer: Buffer
+      let contentType: string
+      let ext: string
 
-      const filePath = `${user.id}/${char.key}.svg`
+      try {
+        // Gemini Imagenで生成
+        imageBuffer = await generateCharacterSheet(char.name, char.promptDescription)
+        contentType = 'image/jpeg'
+        ext = 'jpg'
+      } catch {
+        // フォールバック: SVG
+        const svgContent = generateSvgCharacterSheet(char)
+        imageBuffer = Buffer.from(svgContent, 'utf-8')
+        contentType = 'image/svg+xml'
+        ext = 'svg'
+      }
+
+      const filePath = `${user.id}/${char.key}.${ext}`
       const { error: uploadError } = await svc.storage
         .from('character-sheets')
-        .upload(filePath, svgBuffer, { contentType: 'image/svg+xml', upsert: true })
+        .upload(filePath, imageBuffer, { contentType, upsert: true })
 
       if (uploadError) throw new Error(`upload failed for ${char.key}: ${uploadError.message}`)
 
