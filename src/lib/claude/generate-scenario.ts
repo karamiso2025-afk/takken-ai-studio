@@ -1,7 +1,7 @@
-import Anthropic from '@anthropic-ai/sdk'
+import { GoogleGenAI } from '@google/genai'
 import { TAKKEN_SYSTEM_PROMPT } from './system-prompt'
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+const genai = new GoogleGenAI({ apiKey: process.env.GOOGLE_AI_API_KEY })
 
 export interface MangaPanel {
   panel_number: number
@@ -39,20 +39,34 @@ export async function generateScenario(
     ? `トピック: ${topicName}\n\nコマ数指定: ${panelCountOverride}コマ\n\n内容:\n${extractedContent}`
     : `トピック: ${topicName}\n\n内容:\n${extractedContent}`
 
-  const response = await anthropic.messages.create({
-    model: 'claude-sonnet-4-20250514',
-    max_tokens: 4096,
-    system: TAKKEN_SYSTEM_PROMPT,
-    messages: [{ role: 'user', content: userMessage }],
+  const response = await genai.models.generateContent({
+    model: 'gemini-2.0-flash',
+    contents: [
+      {
+        role: 'user',
+        parts: [{ text: TAKKEN_SYSTEM_PROMPT + '\n\n---\n\n' + userMessage }],
+      },
+    ],
+    config: {
+      responseMimeType: 'application/json',
+      temperature: 0.7,
+      maxOutputTokens: 4096,
+    },
   })
 
-  const text =
-    response.content[0].type === 'text' ? response.content[0].text : ''
+  const text = response.text ?? ''
 
-  const jsonMatch = text.match(/\{[\s\S]*\}/)
-  if (!jsonMatch) {
-    throw new Error('Failed to parse scenario JSON from Claude response')
+  // JSON抽出（application/jsonモードでは直接パース可能だがフォールバックあり）
+  let parsed: ScenarioResult
+  try {
+    parsed = JSON.parse(text) as ScenarioResult
+  } catch {
+    const jsonMatch = text.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) {
+      throw new Error('Failed to parse scenario JSON from Gemini response')
+    }
+    parsed = JSON.parse(jsonMatch[0]) as ScenarioResult
   }
 
-  return JSON.parse(jsonMatch[0]) as ScenarioResult
+  return parsed
 }
