@@ -32,6 +32,8 @@ export function DashboardView({
   const [uploading, setUploading] = useState(false)
   const [extracting, setExtracting] = useState(false)
   const [setupRunning, setSetupRunning] = useState(false)
+  const [setupResult, setSetupResult] = useState<{ ok: boolean; message: string } | null>(null)
+  const [characterSheets, setCharacterSheets] = useState<{ key: string; name: string; url: string }[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
@@ -95,10 +97,28 @@ export function DashboardView({
 
   const handleCharacterSetup = async () => {
     setSetupRunning(true)
+    setSetupResult(null)
     try {
-      await fetch('/api/characters/setup', { method: 'POST' })
+      const res = await fetch('/api/characters/setup', { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) {
+        setSetupResult({ ok: false, message: `エラー: ${data.error || res.status}` })
+        return
+      }
+      if (data.status === 'already_exists') {
+        setSetupResult({ ok: true, message: 'キャラクターシートは既に生成済みです' })
+      } else {
+        setSetupResult({ ok: true, message: `生成完了！${data.succeeded}人成功 / ${data.total}人中${data.failed > 0 ? `（${data.failed}人失敗）` : ''}` })
+      }
+      // 生成済みシートを取得して表示
+      const sheetsRes = await fetch('/api/characters/sheets')
+      if (sheetsRes.ok) {
+        const sheets = await sheetsRes.json()
+        setCharacterSheets(sheets)
+      }
     } catch (err) {
       console.error('Character setup failed:', err)
+      setSetupResult({ ok: false, message: 'ネットワークエラーが発生しました' })
     } finally {
       setSetupRunning(false)
     }
@@ -178,28 +198,54 @@ export function DashboardView({
         />
 
         {/* Character Setup */}
-        <button
-          onClick={handleCharacterSetup}
-          disabled={setupRunning}
-          className="flex items-center gap-4 p-5 bg-white rounded-xl border-2 border-dashed border-gray-300 hover:border-purple-400 hover:bg-purple-50/30 transition-all"
-        >
-          {setupRunning ? (
-            <Loader2 className="w-8 h-8 text-purple-500 animate-spin" />
-          ) : (
-            <Sparkles className="w-8 h-8 text-purple-500" />
+        <div className="flex flex-col gap-2">
+          <button
+            onClick={handleCharacterSetup}
+            disabled={setupRunning}
+            className="flex items-center gap-4 p-5 bg-white rounded-xl border-2 border-dashed border-gray-300 hover:border-purple-400 hover:bg-purple-50/30 transition-all"
+          >
+            {setupRunning ? (
+              <Loader2 className="w-8 h-8 text-purple-500 animate-spin" />
+            ) : (
+              <Sparkles className="w-8 h-8 text-purple-500" />
+            )}
+            <div className="text-left">
+              <p className="font-medium text-gray-900">
+                {setupRunning
+                  ? 'キャラクター生成中... (30〜60秒)'
+                  : 'キャラクターシート生成'}
+              </p>
+              <p className="text-sm text-gray-500">
+                8人のキャラクターをAIで生成・保存
+              </p>
+            </div>
+          </button>
+          {setupResult && (
+            <p className={`text-sm px-3 py-2 rounded-lg ${setupResult.ok ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+              {setupResult.ok ? '✅' : '❌'} {setupResult.message}
+            </p>
           )}
-          <div className="text-left">
-            <p className="font-medium text-gray-900">
-              {setupRunning
-                ? 'キャラクター生成中...'
-                : 'キャラクターシート生成'}
-            </p>
-            <p className="text-sm text-gray-500">
-              9人のキャラクターシートを初回生成（Gemini API）
-            </p>
-          </div>
-        </button>
+        </div>
       </div>
+
+      {/* Character Sheets Preview */}
+      {characterSheets.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 p-4">
+          <h2 className="font-bold text-gray-900 mb-3">生成済みキャラクター</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {characterSheets.map((sheet) => (
+              <div key={sheet.key} className="text-center">
+                <img
+                  src={sheet.url}
+                  alt={sheet.name}
+                  className="w-full aspect-square object-cover rounded-lg border border-gray-200"
+                />
+                <p className="text-xs text-gray-600 mt-1">{sheet.name}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Topic Lists */}
       {pendingTopics.length > 0 && (
