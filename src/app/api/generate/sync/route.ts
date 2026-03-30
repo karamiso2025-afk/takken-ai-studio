@@ -139,7 +139,7 @@ export async function POST(req: NextRequest) {
 
   } catch (err) {
     console.error('[generate/sync]', err)
-    await svc.from('generated_content').update({ status: 'error' }).eq('id', content.id)
+    await svc.from('generated_content').update({ status: 'failed' }).eq('id', content.id)
     return NextResponse.json(
       { error: err instanceof Error ? err.message : 'Generation failed' },
       { status: 500 }
