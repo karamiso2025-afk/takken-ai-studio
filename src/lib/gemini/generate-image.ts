@@ -7,7 +7,7 @@ import { GoogleGenAI } from '@google/genai'
 const ai = new GoogleGenAI({ apiKey: process.env.GOOGLE_AI_API_KEY! })
 
 export async function generateImage(promptEn: string): Promise<Buffer> {
-  const mangaPrompt = `${promptEn}, Japanese manga style, anime illustration, clean line art, pastel colors, simple background, 2 characters talking, educational manga panel`
+  const mangaPrompt = `${promptEn}. anime illustration style, clean line art, pastel colors, simple background. IMPORTANT: absolutely no text, no speech bubbles, no dialogue boxes, no captions, no written words, no letters anywhere in the image`
 
   const response = await ai.models.generateImages({
     model: 'imagen-4.0-generate-001',

@@ -196,11 +196,19 @@ export function ContentView({
     )
   }
 
+  const handleRegenerate = async () => {
+    if (!topicId) return
+    setActiveContentId(null)
+    setStatus(null)
+    await handleGenerate()
+  }
+
   const panelAssets = status?.assets.filter(a => a.panel_number !== null && a.public_url) ?? []
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
       {status && panelAssets.length > 0 && (
+        <div className="flex items-center gap-2">
         <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl w-fit">
           <button onClick={() => setActiveTab('manga')}
             className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
@@ -213,6 +221,11 @@ export function ContentView({
             <Film className="w-4 h-4" />動画プレビュー
             <span className="text-[10px] bg-indigo-100 text-indigo-600 px-1.5 py-0.5 rounded-full">NEW</span>
           </button>
+        </div>
+        <button onClick={handleRegenerate}
+          className="flex items-center gap-1.5 px-3 py-2 text-sm text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors ml-auto">
+          <RefreshCw className="w-3.5 h-3.5" />再生成
+        </button>
         </div>
       )}
 
