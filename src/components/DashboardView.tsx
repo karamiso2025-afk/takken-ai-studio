@@ -102,18 +102,16 @@ export function DashboardView({ onTopicSelect }: { onTopicSelect: (topicId: stri
   return (
     <div className="max-w-4xl mx-auto space-y-5">
 
-      {/* ステップガイド（初回orトピックなし） */}
-      {!hasTopics && (
-        <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl border border-indigo-100 p-6">
-          <h2 className="font-black text-gray-900 text-lg mb-1">🎯 宅建合格への3ステップ</h2>
-          <p className="text-sm text-gray-500 mb-5">教材をアップロードするだけで、AIが漫画・動画・クイズを自動生成します</p>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <StepCard step={1} icon="📄" title="教材をアップロード" desc="PDF または教科書の写真（JPEG/PNG）" active />
-            <StepCard step={2} icon="🎨" title="AIが漫画を生成" desc="トピックごとに6〜10コマの漫画が自動生成" />
-            <StepCard step={3} icon="✅" title="クイズで確認" desc="本試験形式のクイズで理解度チェック" />
-          </div>
+      {/* ステップガイド（常時表示） */}
+      <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl border border-indigo-100 p-6">
+        <h2 className="font-black text-gray-900 text-lg mb-1">🎯 宅建合格への3ステップ</h2>
+        <p className="text-sm text-gray-500 mb-5">教材をアップロードするだけで、AIが漫画・動画・クイズを自動生成します</p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <StepCard step={1} icon="📄" title="教材をアップロード" desc="PDF または教科書の写真（JPEG/PNG）" active={!hasTopics} done={hasTopics} />
+          <StepCard step={2} icon="🎨" title="AIが漫画・動画を生成" desc="トピックごとに6〜10コマの漫画＋動画が自動生成" active={hasTopics && completedTopics.length === 0} done={completedTopics.length > 0} />
+          <StepCard step={3} icon="✅" title="クイズで確認" desc="本試験形式のクイズで理解度チェック" active={completedTopics.length > 0} done={false} />
         </div>
-      )}
+      </div>
 
       {/* 統計カード */}
       {hasTopics && (
@@ -267,15 +265,15 @@ export function DashboardView({ onTopicSelect }: { onTopicSelect: (topicId: stri
   )
 }
 
-function StepCard({ step, icon, title, desc, active }: { step: number; icon: string; title: string; desc: string; active?: boolean }) {
+function StepCard({ step, icon, title, desc, active, done }: { step: number; icon: string; title: string; desc: string; active?: boolean; done?: boolean }) {
   return (
-    <div className={`flex gap-3 p-4 rounded-xl ${active ? 'bg-white shadow-sm border border-indigo-200 ring-2 ring-indigo-100' : 'bg-white/60 border border-gray-100'}`}>
-      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-black flex-shrink-0 ${active ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-500'}`}>
-        {step}
+    <div className={`flex gap-3 p-4 rounded-xl transition-all ${active ? 'bg-white shadow-sm border border-indigo-200 ring-2 ring-indigo-100' : done ? 'bg-white/80 border border-emerald-200' : 'bg-white/60 border border-gray-100'}`}>
+      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-black flex-shrink-0 ${done ? 'bg-emerald-500 text-white' : active ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-500'}`}>
+        {done ? '✓' : step}
       </div>
       <div>
         <div className="text-lg leading-none mb-1">{icon}</div>
-        <p className="font-bold text-sm text-gray-900">{title}</p>
+        <p className={`font-bold text-sm ${done ? 'text-emerald-700' : 'text-gray-900'}`}>{title}</p>
         <p className="text-xs text-gray-500 mt-0.5">{desc}</p>
       </div>
     </div>
