@@ -64,8 +64,15 @@ export async function POST(req: NextRequest) {
       status: 'generating_images',
     }).eq('id', content.id)
 
-    // Step 3: Generate images (with SVG fallback)
-    for (const panel of scenario.manga_panels) {
+    // Step 3: Generate images in parallel (with SVG fallback per panel)
+    await Promise.all(scenario.manga_panels.map(async (panel) => {
+      const overlayData = {
+        dialogue: panel.dialogue,
+        narrator_box: panel.narrator_box,
+        info_box: panel.info_box,
+        scene: panel.scene,
+      } as unknown as Record<string, unknown>
+
       try {
         const imageBuffer = await generateImage(panel.prompt_en)
         const filePath = `${user.id}/${content.id}/panel_${panel.panel_number}.png`
@@ -83,15 +90,11 @@ export async function POST(req: NextRequest) {
           panel_number: panel.panel_number,
           storage_path: filePath,
           public_url: urlData.publicUrl,
-          overlay_data: {
-            dialogue: panel.dialogue,
-            narrator_box: panel.narrator_box,
-            info_box: panel.info_box,
-            scene: panel.scene,
-          } as unknown as Record<string, unknown>,
+          overlay_data: overlayData,
         })
-      } catch {
-        // SVG fallback
+      } catch (imgErr) {
+        console.warn(`[generate/sync] Image gen failed panel ${panel.panel_number}:`, imgErr)
+        // SVG fallback — store overlay_data so MangaViewer can render it
         const svg = generateSvgFallback(panel)
         const svgBuffer = Buffer.from(svg, 'utf-8')
         const filePath = `${user.id}/${content.id}/panel_${panel.panel_number}_fallback.svg`
@@ -109,15 +112,10 @@ export async function POST(req: NextRequest) {
           panel_number: panel.panel_number,
           storage_path: filePath,
           public_url: urlData.publicUrl,
-          overlay_data: {
-            dialogue: panel.dialogue,
-            narrator_box: panel.narrator_box,
-            info_box: panel.info_box,
-            scene: panel.scene,
-          } as unknown as Record<string, unknown>,
+          overlay_data: overlayData,
         })
       }
-    }
+    }))
 
     // Step 4: Save quiz
     if (scenario.quiz) {
