@@ -26,6 +26,15 @@ export async function POST() {
     return NextResponse.json({ status: 'already_exists' })
   }
 
+  // Ensure storage bucket exists
+  const { error: bucketError } = await svc.storage.createBucket('character-sheets', {
+    public: true,
+    allowedMimeTypes: ['image/png', 'image/jpeg', 'image/webp'],
+  })
+  if (bucketError && !bucketError.message.includes('already exists')) {
+    console.error('[character setup] bucket creation failed:', bucketError.message)
+  }
+
   // Generate all character sheets in parallel
   const results = await Promise.allSettled(
     ALL_CHARACTERS.map(async (char) => {
@@ -36,7 +45,7 @@ export async function POST() {
         .from('character-sheets')
         .upload(filePath, imageBuffer, { contentType: 'image/png', upsert: true })
 
-      if (uploadError) throw uploadError
+      if (uploadError) throw new Error(`upload failed for ${char.key}: ${uploadError.message}`)
 
       const { data: urlData } = svc.storage
         .from('character-sheets')
@@ -56,6 +65,13 @@ export async function POST() {
 
   const succeeded = results.filter((r) => r.status === 'fulfilled').length
   const failed = results.filter((r) => r.status === 'rejected').length
+  const errors = results
+    .filter((r): r is PromiseRejectedResult => r.status === 'rejected')
+    .map((r) => r.reason?.message ?? String(r.reason))
 
-  return NextResponse.json({ status: 'complete', succeeded, failed, total: ALL_CHARACTERS.length })
+  if (errors.length > 0) {
+    console.error('[character setup] failures:', errors)
+  }
+
+  return NextResponse.json({ status: 'complete', succeeded, failed, total: ALL_CHARACTERS.length, errors })
 }
