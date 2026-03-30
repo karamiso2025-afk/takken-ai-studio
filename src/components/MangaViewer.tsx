@@ -1,11 +1,10 @@
 'use client'
 
-import Image from 'next/image'
 import { getCharacterByKey } from '@/lib/characters'
 
 interface ContentAsset {
-  id: string
-  asset_type: string
+  id?: string
+  asset_type?: string
   panel_number: number | null
   public_url: string | null
   overlay_data: {
@@ -16,150 +15,235 @@ interface ContentAsset {
   } | null
 }
 
-// キャラクターごとの色設定
-const CHAR_STYLES: Record<string, { bg: string; border: string; label: string; avatar: string }> = {
-  tanaka:   { bg: 'bg-orange-50',  border: 'border-orange-300', label: 'text-orange-600', avatar: '🕴️' },
-  sato:     { bg: 'bg-green-50',   border: 'border-green-300',  label: 'text-green-700',  avatar: '🙋' },
-  yamada:   { bg: 'bg-blue-50',    border: 'border-blue-300',   label: 'text-blue-700',   avatar: '👩‍💼' },
-  narrator: { bg: 'bg-gray-100',   border: 'border-gray-300',   label: 'text-gray-600',   avatar: '📢' },
-  suzuki:   { bg: 'bg-yellow-50',  border: 'border-yellow-400', label: 'text-yellow-700', avatar: '🏠' },
-  nakamura: { bg: 'bg-slate-50',   border: 'border-slate-400',  label: 'text-slate-700',  avatar: '🏦' },
-  kuroda:   { bg: 'bg-red-50',     border: 'border-red-400',    label: 'text-red-700',    avatar: '😈' },
-  kimura:   { bg: 'bg-teal-50',    border: 'border-teal-400',   label: 'text-teal-700',   avatar: '🏛️' },
-  takahashi:{ bg: 'bg-purple-50',  border: 'border-purple-400', label: 'text-purple-700', avatar: '🧮' },
+// キャラクター別スタイル定義
+const CHAR_STYLES: Record<string, {
+  bg: string
+  border: string
+  label: string
+  headerBg: string
+  textColor: string
+  initial: string
+}> = {
+  tanaka:    { bg: '#FFF3E0', border: '#FF8F00', label: '#E65100', headerBg: '#FF8F00', textColor: '#BF360C', initial: '田' },
+  sato:      { bg: '#E8F5E9', border: '#388E3C', label: '#1B5E20', headerBg: '#388E3C', textColor: '#1B5E20', initial: '佐' },
+  yamada:    { bg: '#E3F2FD', border: '#1565C0', label: '#0D47A1', headerBg: '#1565C0', textColor: '#0D47A1', initial: '山' },
+  narrator:  { bg: '#F5F5F5', border: '#616161', label: '#424242', headerBg: '#616161', textColor: '#212121', initial: 'N' },
+  suzuki:    { bg: '#FFFDE7', border: '#F9A825', label: '#F57F17', headerBg: '#F9A825', textColor: '#E65100', initial: '鈴' },
+  nakamura:  { bg: '#ECEFF1', border: '#546E7A', label: '#37474F', headerBg: '#546E7A', textColor: '#263238', initial: '中' },
+  kuroda:    { bg: '#FFEBEE', border: '#C62828', label: '#B71C1C', headerBg: '#C62828', textColor: '#B71C1C', initial: '黒' },
+  kimura:    { bg: '#E0F2F1', border: '#00695C', label: '#004D40', headerBg: '#00695C', textColor: '#004D40', initial: '木' },
+  takahashi: { bg: '#F3E5F5', border: '#6A1B9A', label: '#4A148C', headerBg: '#6A1B9A', textColor: '#4A148C', initial: '高' },
 }
 
 function getCharStyle(key: string) {
-  return CHAR_STYLES[key] ?? { bg: 'bg-gray-50', border: 'border-gray-300', label: 'text-gray-600', avatar: '👤' }
+  return CHAR_STYLES[key] ?? { bg: '#FAFAFA', border: '#9E9E9E', label: '#757575', headerBg: '#9E9E9E', textColor: '#616161', initial: '?' }
 }
 
-export function MangaViewer({
-  assets,
-  panelCount,
-}: {
-  assets: ContentAsset[]
-  panelCount: number
-}) {
-  const sortedPanels = [...assets]
+export function MangaViewer({ assets, panelCount }: { assets: ContentAsset[]; panelCount: number }) {
+  const panels = [...assets]
     .filter((a) => a.panel_number !== null)
-    .sort((a, b) => (a.panel_number || 0) - (b.panel_number || 0))
+    .sort((a, b) => (a.panel_number ?? 0) - (b.panel_number ?? 0))
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-4">
-      <h3 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
-        📖 漫画ビューア
-        <span className="text-sm font-normal text-gray-400">
-          ({panelCount}コマ)
+    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      {/* ヘッダー */}
+      <div className="bg-gray-900 text-white px-5 py-3 flex items-center gap-3">
+        <span className="text-xl">📖</span>
+        <span className="font-bold text-lg tracking-wide">マンガで学ぶ宅建</span>
+        <span className="ml-auto text-sm text-gray-400 bg-gray-800 px-2 py-0.5 rounded-full">
+          {panelCount}コマ
         </span>
-      </h3>
+      </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        {sortedPanels.map((panel) => (
-          <PanelCell key={panel.id} panel={panel} />
+      {/* パネルグリッド */}
+      <div
+        className="grid gap-0.5 bg-gray-800 p-0.5"
+        style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}
+      >
+        {panels.map((panel) => (
+          <MangaPanel key={panel.id} panel={panel} />
         ))}
       </div>
     </div>
   )
 }
 
-function PanelCell({ panel }: { panel: ContentAsset }) {
+function MangaPanel({ panel }: { panel: ContentAsset }) {
   const overlay = panel.overlay_data
-  const isSvg = panel.asset_type === 'svg_fallback'
-  const hasRealImage = panel.public_url && !isSvg
-
-  // 実画像がある場合はそちらを表示＋オーバーレイ
-  if (hasRealImage) {
-    return (
-      <div className="relative rounded-lg overflow-hidden border-2 border-gray-800 bg-gray-50 aspect-[4/3]">
-        <Image
-          src={panel.public_url!}
-          alt={`Panel ${panel.panel_number}`}
-          fill
-          className="object-cover"
-          unoptimized
-        />
-        {overlay?.dialogue?.map((d, i) => {
-          const char = getCharacterByKey(d.character)
-          const style = getCharStyle(d.character)
-          return (
-            <div
-              key={i}
-              className={`absolute ${style.bg} ${style.border} border rounded-2xl px-2 py-1 shadow max-w-[55%]`}
-              style={{ top: `${10 + i * 24}%`, left: i % 2 === 0 ? '3%' : '42%' }}
-            >
-              <span className={`text-[8px] font-bold ${style.label} block`}>
-                {style.avatar} {char?.name.split(' ')[0]}
-              </span>
-              <p className="text-[11px] font-medium text-gray-800 leading-tight">{d.text}</p>
-            </div>
-          )
-        })}
-        {overlay?.info_box && (
-          <div className="absolute bottom-1 left-1 right-1 bg-blue-600 text-white text-[10px] font-bold px-2 py-1 rounded text-center">
-            📌 {overlay.info_box}
-          </div>
-        )}
-        <div className="absolute top-0 left-0 bg-gray-800 text-white text-[10px] font-bold px-2 py-0.5 rounded-br">
-          {panel.panel_number}
-        </div>
-      </div>
-    )
-  }
-
-  // SVGフォールバック: overlay_dataからリッチなパネルをHTML/CSSで描画
   const dialogue = overlay?.dialogue ?? []
   const infoBox = overlay?.info_box
-  const scene = overlay?.scene
   const narratorBox = overlay?.narrator_box
+  const scene = overlay?.scene ?? ''
+
+  // 実画像がある場合はその上にオーバーレイ
+  const hasImage = (panel.asset_type === 'image' || (!panel.asset_type && panel.public_url)) && panel.public_url
 
   return (
-    <div className="rounded-lg overflow-hidden border-2 border-gray-800 flex flex-col bg-amber-50 min-h-[200px]">
-      {/* パネルヘッダー */}
-      <div className="bg-gray-800 text-white px-3 py-1.5 flex items-center gap-2">
-        <span className="text-xs font-bold bg-white text-gray-800 rounded-full w-5 h-5 flex items-center justify-center flex-shrink-0">
+    <div
+      className="bg-white flex flex-col"
+      style={{ minHeight: 280, fontFamily: '"Hiragino Kaku Gothic Pro", "Meiryo", sans-serif' }}
+    >
+      {/* パネル番号 + シーン */}
+      <div className="flex items-center gap-2 bg-gray-900 px-2 py-1.5">
+        <span
+          className="text-white font-black text-sm w-6 h-6 rounded-full bg-white text-gray-900 flex items-center justify-center flex-shrink-0"
+          style={{ fontSize: 12 }}
+        >
           {panel.panel_number}
         </span>
-        <span className="text-xs font-medium truncate">{scene ?? ''}</span>
+        <span className="text-gray-300 text-xs truncate flex-1">{scene}</span>
       </div>
 
-      {/* セリフエリア */}
-      <div className="flex-1 p-3 flex flex-col gap-2.5">
-        {dialogue.map((d, i) => {
-          const char = getCharacterByKey(d.character)
-          const style = getCharStyle(d.character)
-          const isRight = i % 2 === 1
-          return (
-            <div key={i} className={`flex items-start gap-2 ${isRight ? 'flex-row-reverse' : ''}`}>
-              {/* アバター */}
-              <div className={`flex-shrink-0 w-9 h-9 rounded-full border-2 ${style.border} ${style.bg} flex items-center justify-center text-lg`}>
-                {style.avatar}
-              </div>
-              {/* 吹き出し */}
-              <div className={`relative ${style.bg} border ${style.border} rounded-2xl px-3 py-2 max-w-[75%] shadow-sm
-                ${isRight ? 'rounded-tr-sm' : 'rounded-tl-sm'}`}>
-                <p className={`text-[9px] font-bold ${style.label} mb-0.5`}>
-                  {char?.name.split(' ')[0] ?? d.character}
-                </p>
-                <p className="text-[13px] text-gray-800 leading-snug font-medium">{d.text}</p>
-              </div>
-            </div>
-          )
-        })}
-
-        {/* ナレーターボックス */}
-        {narratorBox && (
-          <div className="bg-gray-700 text-white text-xs px-3 py-1.5 rounded text-center italic">
-            {narratorBox}
+      {/* イラスト領域（実画像 or キャラクター描画エリア） */}
+      <div className="relative flex-1 flex flex-col">
+        {hasImage ? (
+          // 実画像 + テキストオーバーレイ
+          <div className="relative" style={{ minHeight: 140 }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={panel.public_url!}
+              alt={`コマ${panel.panel_number}`}
+              className="w-full object-cover"
+              style={{ maxHeight: 160 }}
+            />
+            {/* キャラクター吹き出しオーバーレイ */}
+            {dialogue.slice(0, 2).map((d, i) => {
+              const style = getCharStyle(d.character)
+              return (
+                <div
+                  key={i}
+                  className="absolute rounded-xl px-2 py-1 shadow-lg border-2 text-xs font-bold max-w-[48%]"
+                  style={{
+                    background: style.bg,
+                    borderColor: style.border,
+                    top: `${5 + i * 42}%`,
+                    left: i % 2 === 0 ? '2%' : '50%',
+                    color: style.textColor,
+                  }}
+                >
+                  <div className="text-[9px] font-black mb-0.5" style={{ color: style.label }}>
+                    {getCharacterByKey(d.character)?.name.split(' ')[0] ?? d.character}
+                  </div>
+                  <div style={{ fontSize: 11, lineHeight: 1.3 }}>{d.text}</div>
+                </div>
+              )
+            })}
+          </div>
+        ) : (
+          // キャラクターイラストエリア（アバター＋名前）
+          <div className="flex justify-around items-end px-3 pt-3 pb-1" style={{ minHeight: 80 }}>
+            {getUniqueCharacters(dialogue).map((charKey) => (
+              <CharacterAvatar key={charKey} charKey={charKey} />
+            ))}
           </div>
         )}
+
+        {/* セリフエリア */}
+        <div className="px-2 pb-2 flex flex-col gap-1.5">
+          {dialogue.map((d, i) => (
+            <SpeechBubble key={i} charKey={d.character} text={d.text} isRight={i % 2 === 1} />
+          ))}
+
+          {narratorBox && (
+            <div
+              className="text-xs text-center py-1.5 px-2 rounded italic font-medium"
+              style={{ background: '#37474F', color: '#ECEFF1', fontSize: 11 }}
+            >
+              ▼ {narratorBox}
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* infobox */}
+      {/* 重要情報ボックス */}
       {infoBox && (
-        <div className="bg-blue-600 text-white text-xs font-bold px-3 py-2 text-center">
-          📌 {infoBox}
+        <div
+          className="flex items-center gap-1.5 px-3 py-2 text-white font-bold"
+          style={{ background: '#1565C0', fontSize: 11 }}
+        >
+          <span>📌</span>
+          <span className="leading-tight">{infoBox}</span>
         </div>
       )}
+    </div>
+  )
+}
+
+function getUniqueCharacters(dialogue: { character: string; text: string }[]): string[] {
+  const seen = new Set<string>()
+  const result: string[] = []
+  for (const d of dialogue) {
+    if (!seen.has(d.character) && d.character !== 'narrator') {
+      seen.add(d.character)
+      result.push(d.character)
+    }
+  }
+  return result.slice(0, 3)
+}
+
+function CharacterAvatar({ charKey }: { charKey: string }) {
+  const style = getCharStyle(charKey)
+  const char = getCharacterByKey(charKey)
+  const firstName = char?.name.split(' ')[0] ?? charKey
+
+  return (
+    <div className="flex flex-col items-center gap-0.5">
+      {/* SVGキャラクターシルエット */}
+      <svg width="44" height="52" viewBox="0 0 44 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+        {/* 頭 */}
+        <ellipse cx="22" cy="13" rx="10" ry="11" fill={style.bg} stroke={style.border} strokeWidth="2" />
+        {/* 表情（目） */}
+        <circle cx="18" cy="12" r="1.5" fill={style.label} />
+        <circle cx="26" cy="12" r="1.5" fill={style.label} />
+        {/* 口 */}
+        <path d="M18 17 Q22 20 26 17" stroke={style.label} strokeWidth="1.5" fill="none" strokeLinecap="round" />
+        {/* 首 */}
+        <rect x="19" y="23" width="6" height="5" fill={style.bg} stroke={style.border} strokeWidth="1" />
+        {/* 胴体 */}
+        <path d="M8 52 L10 28 Q22 25 34 28 L36 52 Z" fill={style.headerBg} stroke={style.border} strokeWidth="1.5" />
+        {/* 頭文字 */}
+        <text x="22" y="16" textAnchor="middle" fontSize="10" fontWeight="bold" fill={style.label}>{style.initial}</text>
+      </svg>
+      <span className="text-xs font-bold" style={{ color: style.label, fontSize: 10 }}>{firstName}</span>
+    </div>
+  )
+}
+
+function SpeechBubble({
+  charKey,
+  text,
+  isRight,
+}: {
+  charKey: string
+  text: string
+  isRight: boolean
+}) {
+  const style = getCharStyle(charKey)
+  const char = getCharacterByKey(charKey)
+  const firstName = char?.name.split(' ')[0] ?? charKey
+
+  return (
+    <div className={`flex items-start gap-1.5 ${isRight ? 'flex-row-reverse' : ''}`}>
+      {/* 小さいアバターアイコン */}
+      <div
+        className="w-7 h-7 rounded-full flex items-center justify-center text-white font-black flex-shrink-0 text-xs shadow"
+        style={{ background: style.headerBg, border: `2px solid ${style.border}` }}
+      >
+        {style.initial}
+      </div>
+      {/* 吹き出し */}
+      <div
+        className={`relative rounded-2xl px-2.5 py-1.5 shadow-sm max-w-[80%] border-2 ${isRight ? 'rounded-tr-sm' : 'rounded-tl-sm'}`}
+        style={{ background: style.bg, borderColor: style.border }}
+      >
+        <div className="font-black text-[9px] mb-0.5" style={{ color: style.label }}>{firstName}</div>
+        <div
+          className="font-medium leading-tight"
+          style={{ color: '#1a1a1a', fontSize: 12 }}
+        >
+          {text}
+        </div>
+      </div>
     </div>
   )
 }
