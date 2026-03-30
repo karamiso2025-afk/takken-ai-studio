@@ -331,6 +331,9 @@ export async function POST() {
   // バケットが存在しない場合は作成
   await svc.storage.createBucket('character-sheets', { public: true }).catch(() => {/* already exists */})
 
+  // 既存レコードを削除（重複防止）
+  await svc.from('character_sheets').delete().eq('user_id', user.id)
+
   // 全キャラクターの画像を生成してStorageに保存（Gemini Imagen → SVGフォールバック）
   const results = await Promise.allSettled(
     ALL_CHARACTERS.map(async (char) => {
@@ -343,8 +346,9 @@ export async function POST() {
         imageBuffer = await generateCharacterSheet(char.name, char.promptDescription)
         contentType = 'image/jpeg'
         ext = 'jpg'
-      } catch {
+      } catch (geminiErr) {
         // フォールバック: SVG
+        console.error(`Gemini failed for ${char.key}:`, geminiErr)
         const svgContent = generateSvgCharacterSheet(char)
         imageBuffer = Buffer.from(svgContent, 'utf-8')
         contentType = 'image/svg+xml'
