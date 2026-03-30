@@ -85,6 +85,20 @@ export function ContentView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [contentId])
 
+  // topicIdがあるがcontentIdがない場合、既存コンテンツを自動検索
+  useEffect(() => {
+    if (!topicId || activeContentId) return
+    fetch(`/api/generate/by-topic?topic_id=${topicId}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data?.content_id) {
+          setActiveContentId(data.content_id)
+          onContentGenerated(data.content_id)
+        }
+      })
+      .catch(() => {})
+  }, [topicId, activeContentId, onContentGenerated])
+
   useEffect(() => {
     if (activeContentId && !status) { pollStatus(activeContentId) }
   }, [activeContentId, status, pollStatus])
