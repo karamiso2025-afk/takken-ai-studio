@@ -29,15 +29,29 @@ interface Stats {
   contentCount: number
 }
 
+interface CharacterSheet {
+  key: string
+  name: string
+  url: string | null
+}
+
 export function DashboardView({ onTopicSelect }: { onTopicSelect: (topicId: string) => void }) {
   const [stats, setStats] = useState<Stats | null>(null)
   const [uploading, setUploading] = useState(false)
   const [extracting, setExtracting] = useState(false)
   const [setupRunning, setSetupRunning] = useState(false)
   const [setupResult, setSetupResult] = useState<{ ok: boolean; message: string } | null>(null)
+  const [sheets, setSheets] = useState<CharacterSheet[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  useEffect(() => { loadStats() }, [])
+  useEffect(() => { loadStats(); loadSheets() }, [])
+
+  const loadSheets = async () => {
+    try {
+      const res = await fetch('/api/characters/sheets')
+      if (res.ok) setSheets(await res.json())
+    } catch { /* ignore */ }
+  }
 
   const loadStats = async () => {
     try {
@@ -82,10 +96,12 @@ export function DashboardView({ onTopicSelect }: { onTopicSelect: (topicId: stri
       }
       if (data.status === 'already_exists') {
         setSetupResult({ ok: true, message: 'キャラクターシートは生成済みです' })
+        await loadSheets()
       } else if (data.succeeded === 0 && data.errors?.length > 0) {
         setSetupResult({ ok: false, message: `全員失敗: ${data.errors[0]}` })
       } else {
         setSetupResult({ ok: true, message: `生成完了！${data.succeeded}人成功 / ${data.total}人中${data.failed > 0 ? `（失敗: ${data.errors?.[0] ?? '不明'}）` : ''}` })
+        await loadSheets()
       }
     } catch {
       setSetupResult({ ok: false, message: 'ネットワークエラーが発生しました' })
@@ -174,6 +190,32 @@ export function DashboardView({ onTopicSelect }: { onTopicSelect: (topicId: stri
           )}
         </div>
       </div>
+
+      {/* キャラクターシート一覧 */}
+      {sheets.length > 0 && (
+        <div className="bg-white rounded-xl border border-purple-100 overflow-hidden">
+          <div className="px-5 py-3 bg-purple-50 border-b border-purple-100 flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-purple-500" />
+            <h2 className="font-bold text-gray-900">登場キャラクター</h2>
+            <span className="text-xs text-purple-600 bg-purple-100 px-2 py-0.5 rounded-full ml-auto">{sheets.length}人</span>
+          </div>
+          <div className="p-4 grid grid-cols-4 sm:grid-cols-8 gap-3">
+            {sheets.map((s) => (
+              <div key={s.key} className="flex flex-col items-center gap-1">
+                {s.url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={s.url} alt={s.name} className="w-full rounded-lg border border-purple-100 shadow-sm" style={{ aspectRatio: '3/4', objectFit: 'cover' }} />
+                ) : (
+                  <div className="w-full rounded-lg border border-purple-100 bg-purple-50 flex items-center justify-center" style={{ aspectRatio: '3/4' }}>
+                    <span className="text-2xl">👤</span>
+                  </div>
+                )}
+                <span className="text-[10px] font-bold text-gray-600 text-center">{s.name}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* 未生成トピック */}
       {pendingTopics.length > 0 && (
