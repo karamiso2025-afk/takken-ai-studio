@@ -82,8 +82,10 @@ export function DashboardView({ onTopicSelect }: { onTopicSelect: (topicId: stri
       }
       if (data.status === 'already_exists') {
         setSetupResult({ ok: true, message: 'キャラクターシートは生成済みです' })
+      } else if (data.succeeded === 0 && data.errors?.length > 0) {
+        setSetupResult({ ok: false, message: `全員失敗: ${data.errors[0]}` })
       } else {
-        setSetupResult({ ok: true, message: `生成完了！${data.succeeded}人成功 / ${data.total}人中` })
+        setSetupResult({ ok: true, message: `生成完了！${data.succeeded}人成功 / ${data.total}人中${data.failed > 0 ? `（失敗: ${data.errors?.[0] ?? '不明'}）` : ''}` })
       }
     } catch {
       setSetupResult({ ok: false, message: 'ネットワークエラーが発生しました' })
